@@ -6,26 +6,113 @@ import * as React from 'react'
 // fetchPokemon: the function we call to get the pokemon info
 // PokemonInfoFallback: the thing we show while we're loading the pokemon info
 // PokemonDataView: the stuff we use to display the pokemon info
-import {PokemonForm} from '../pokemon'
+import {PokemonForm, PokemonDataView, PokemonInfoFallback, fetchPokemon} from '../pokemon'
+
+// From https://reactjs.org/docs/error-boundaries.html
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error) {
+    // Update state so the next render will show the fallback UI.
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    // You can also log the error to an error reporting service
+    console.error(error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      // You can render any custom fallback UI
+      return <h1>Something went wrong.</h1>;
+    }
+
+    return this.props.children; 
+  }
+}
+
+const statuses = {
+  idle: 'idle',
+  pending: 'pending',
+  resolved: 'resolved',
+  rejected: 'rejected'
+}
+
+function pokemonMetaReducer(prevState, action) {
+  switch (action.type) {
+    case statuses.pending:
+      return {
+        ...prevState,
+        pokemon: null,
+        error: null,
+        status: action.type
+      }
+    case statuses.resolved:
+      return {
+        ...prevState,
+        pokemon: action.pokemon,
+        status: action.type
+      }
+    case statuses.rejected:
+      return {
+        ...prevState,
+        error: action.error,
+        status: action.type
+      }
+    default:
+      return prevState;
+  }
+}
 
 function PokemonInfo({pokemonName}) {
-  // 🐨 Have state for the pokemon (null)
-  // 🐨 use React.useEffect where the callback should be called whenever the
-  // pokemon name changes.
-  // 💰 DON'T FORGET THE DEPENDENCIES ARRAY!
-  // 💰 if the pokemonName is falsy (an empty string) then don't bother making the request (exit early).
-  // 🐨 before calling `fetchPokemon`, clear the current pokemon state by setting it to null
-  // 💰 Use the `fetchPokemon` function to fetch a pokemon by its name:
-  //   fetchPokemon('Pikachu').then(
-  //     pokemonData => { /* update all the state here */},
-  //   )
-  // 🐨 return the following things based on the `pokemon` state and `pokemonName` prop:
-  //   1. no pokemonName: 'Submit a pokemon'
-  //   2. pokemonName but no pokemon: <PokemonInfoFallback name={pokemonName} />
-  //   3. pokemon: <PokemonDataView pokemon={pokemon} />
+  const [pokemonMeta, pokemonMetaDispatch] = React.useReducer(
+    pokemonMetaReducer, 
+    {
+      pokemon: null, 
+      error: null, 
+      status: statuses.idle
+    }
+  )
 
-  // 💣 remove this
-  return 'TODO'
+  React.useEffect(() => {
+    if (!pokemonName) {
+      return;
+    }
+    pokemonMetaDispatch({type: statuses.pending})
+    fetchPokemon(pokemonName)
+      .then(pokemonData => {
+        pokemonMetaDispatch({type: statuses.resolved, pokemon: pokemonData})
+      })
+      .catch(error => {
+        pokemonMetaDispatch({type: statuses.rejected, error: error})
+      })
+  }, [pokemonName])
+
+  function getView() {
+    switch (pokemonMeta.status) {
+      case statuses.idle:
+        return 'Submit a pokemon';
+      case statuses.pending:
+        return <PokemonInfoFallback name={pokemonName} />;
+      case statuses.resolved:
+        return <PokemonDataView pokemon={pokemonMeta.pokemon} />;
+      case statuses.rejected:
+        throw pokemonMeta.error
+        // return (
+        //   <div role="alert">
+        //     There was an error: <pre style={{whiteSpace: 'normal'}}>{pokemonMeta.error.message}</pre>
+        //   </div>
+        // )
+      default:
+        return null;
+    }
+  }
+
+  return getView()
 }
 
 function App() {
@@ -40,7 +127,9 @@ function App() {
       <PokemonForm pokemonName={pokemonName} onSubmit={handleSubmit} />
       <hr />
       <div className="pokemon-info">
-        <PokemonInfo pokemonName={pokemonName} />
+        <ErrorBoundary>
+          <PokemonInfo pokemonName={pokemonName} />
+        </ErrorBoundary>  
       </div>
     </div>
   )
