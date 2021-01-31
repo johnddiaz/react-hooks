@@ -8,7 +8,7 @@ import VanillaTilt from 'vanilla-tilt'
 // If you'd rather practice refactoring a class component to a function
 // component with hooks, then go ahead and do this exercise.
 
-function Tilt(props) {
+function Tilt(props) { 
   const tiltRef = React.useRef()
 
   React.useEffect(() => {
